@@ -1,0 +1,43 @@
+apiVersion: example.com/v1
+kind: WebPage
+metadata:
+  name: hello-world
+  namespace: default
+spec:
+  title: "Hello World"
+  html: |
+    <html>
+    <head>
+      <title>Hello World</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1 { color: #007bff; }
+        p { color: #555; }
+      </style>
+    </head>
+    <body>
+      <h1>Hello from Kubernetes!</h1>
+      <p>This page was created by the JOSDK Operator</p>
+      <p>Pod Name: ${HOSTNAME}</p>
+    </body>
+    </html>
+
+---
+apiVersion: example.com/v1
+kind: WebPage
+metadata:
+  name: test-page
+  namespace: default
+spec:
+  title: "Test Page"
+  html: |
+    <html>
+    <head>
+      <title>Test Page</title>
+    </head>
+    <body>
+      <h1>Test Page</h1>
+      <p>This is a test webpage</p>
+    </body>
+    </html>
+

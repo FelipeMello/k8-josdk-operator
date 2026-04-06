@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: josdk-operator
+  cloud:
+    kubernetes:
+      enabled: true
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    root: INFO
+    com.k8.josdkoperator: DEBUG
+    io.javaoperatorsdk: INFO
+    io.fabric8.kubernetes: WARN
+
