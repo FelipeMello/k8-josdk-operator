@@ -1,0 +1,243 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Build and test the Java application
+  build-and-test:
+    runs-on: ubuntu-latest  # Ubuntu provides Maven, Java tools, and Docker
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 25
+      uses: actions/setup-java@v4
+      with:
+        java-version: '25'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+
+    - name: Build with Maven
+      run: ./mvnw clean compile -B
+
+    - name: Run tests
+      run: ./mvnw test -B
+
+    - name: Package application
+      run: ./mvnw package -DskipTests -B
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: josdk-operator-jar
+        path: target/josdkoperator-*.jar
+        retention-days: 7
+
+  # Build and push Docker image
+  build-docker:
+    needs: build-and-test
+    runs-on: ubuntu-latest  # Ubuntu has Docker daemon and build tools
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download JAR artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: josdk-operator-jar
+        path: target/
+
+    - name: Set up Docker Buildx
+      uses: actions/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Validate Kubernetes manifests
+  validate-k8s:
+    runs-on: ubuntu-latest  # Ubuntu has curl and basic tools
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install kubeconform
+      run: |
+        curl -LO https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+        tar -xzf kubeconform-linux-amd64.tar.gz
+        sudo mv kubeconform /usr/local/bin/
+
+    - name: Validate Kubernetes manifests
+      run: |
+        find k8s/ -name "*.yaml" -exec kubeconform -strict {} \;
+
+  # Security scanning
+  security-scan:
+    needs: build-docker
+    runs-on: ubuntu-latest  # Ubuntu has good tool support
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Code quality checks
+  code-quality:
+    runs-on: ubuntu-latest  # Ubuntu provides Java and Maven tools
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 25
+      uses: actions/setup-java@v4
+      with:
+        java-version: '25'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+
+    - name: Run Maven verify (includes checkstyle, spotbugs, etc.)
+      run: ./mvnw verify -B -DskipTests
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          target/surefire-reports/
+          target/failsafe-reports/
+        retention-days: 7
+
+  # Integration test with KinD (optional, can be triggered manually)
+  integration-test:
+    needs: build-docker
+    runs-on: ubuntu-latest  # Ubuntu supports KinD and Kubernetes tools
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[integration]')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up KinD
+      uses: helm/kind-action@v1
+      with:
+        cluster_name: operator-test
+        config: .github/kind-config.yaml
+
+    - name: Load Docker image into KinD
+      run: |
+        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        kind load docker-image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest --name operator-test
+
+    - name: Install operator
+      run: |
+        kubectl create namespace operators
+        kubectl apply -f k8s/crd-webpage.yaml
+        kubectl apply -f k8s/rbac.yaml
+        kubectl apply -f k8s/operator-deployment.yaml
+        kubectl wait --for=condition=available --timeout=120s deployment/josdk-operator -n operators
+
+    - name: Run integration tests
+      run: |
+        kubectl apply -f k8s/example-webpages.yaml
+        sleep 30
+        kubectl get webpages
+        kubectl get configmaps
+        kubectl get services
+        kubectl get deployments
+
+    - name: Check operator logs
+      if: always()
+      run: kubectl logs -n operators deployment/josdk-operator --tail=50
+
+  # Release on tag
+  release:
+    needs: [build-and-test, build-docker, validate-k8s, security-scan, code-quality]
+    runs-on: ubuntu-latest  # Ubuntu has GitHub CLI and release tools
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+      packages: write
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Create GitHub release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        body: |
+          ## Changes
+          - Automated release from CI/CD pipeline
+          - Docker image available at: `ghcr.io/${{ github.repository }}:latest`
+        draft: false
+        prerelease: false
