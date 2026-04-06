@@ -181,7 +181,16 @@
             </activation>
             <build>
                 <plugins>
-                    <!-- Enforce stricter checks in CI -->
+                    <!-- Enforce stricter checkstyle checks in CI -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-checkstyle-plugin</artifactId>
+                        <configuration>
+                            <failsOnError>true</failsOnError>
+                        </configuration>
+                    </plugin>
+                    <!-- SpotBugs disabled due to Java 25 compatibility -->
+                    <!-- Uncomment when SpotBugs supports Java 25
                     <plugin>
                         <groupId>com.github.spotbugs</groupId>
                         <artifactId>spotbugs-maven-plugin</artifactId>
@@ -189,6 +198,7 @@
                             <failOnError>true</failOnError>
                         </configuration>
                     </plugin>
+                    -->
                 </plugins>
             </build>
         </profile>
