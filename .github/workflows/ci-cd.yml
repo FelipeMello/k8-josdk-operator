@@ -11,10 +11,6 @@ on:
       - '.github/workflows/ci-cd.yml'
   pull_request:
     branches: [ master, develop ]
-    paths:
-      - 'src/**'
-      - 'pom.xml'
-      - 'Dockerfile'
   workflow_dispatch:
 
 env:
