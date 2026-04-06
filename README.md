@@ -24,6 +24,47 @@
 
 ---
 
+## 🚀 **CI/CD Pipeline**
+
+### GitHub Actions Workflow
+This project includes a comprehensive CI/CD pipeline powered by GitHub Actions:
+
+#### **Pipeline Features:**
+- ✅ **Automated Testing**: Unit tests, integration tests, code quality checks
+- ✅ **Docker Build**: Automated container image building and publishing
+- ✅ **Security Scanning**: Vulnerability scanning with Trivy
+- ✅ **Kubernetes Validation**: Manifest validation with kubeconform
+- ✅ **Code Coverage**: JaCoCo coverage reports
+- ✅ **Multi-Stage Pipeline**: Parallel jobs for efficiency
+
+#### **Workflow Triggers:**
+- **Push to main/develop**: Full CI/CD pipeline
+- **Pull Requests**: Validation and testing
+- **Manual Trigger**: Integration tests on demand
+- **Tag Creation**: Automated releases
+
+#### **Pipeline Jobs:**
+1. **build-and-test**: Java compilation, unit tests, packaging
+2. **build-docker**: Container image build and push to GHCR
+3. **validate-k8s**: Kubernetes manifest validation
+4. **security-scan**: Vulnerability scanning and SARIF reports
+5. **code-quality**: Checkstyle, SpotBugs, code coverage
+6. **integration-test**: KinD-based integration testing (manual/on-demand)
+7. **release**: Automated GitHub releases on tags
+
+#### **Viewing CI/CD Results:**
+```bash
+# Check workflow status
+gh workflow list
+gh workflow view ci-cd.yml
+
+# View latest run
+gh run list --workflow=ci-cd.yml
+gh run view <run-id>
+```
+
+---
+
 ## 📚 Documentation by Task
 
 ### "I want to run this right now"
@@ -81,6 +122,11 @@
 │   ├── SPRING_BOOT_GUIDE.md           ← Configuration
 │   └── CHANGES.md                     ← Change history
 │
+├── 🚀 CI/CD
+│   └── .github/
+│       ├── workflows/ci-cd.yml        ← GitHub Actions pipeline
+│       └── kind-config.yaml           ← KinD configuration
+│
 ├── 🐳 DOCKER
 │   └── Dockerfile                     ← Container definition
 │
@@ -91,7 +137,7 @@
 │       ├── operator-deployment.yaml   ← Operator deployment
 │       └── example-webpages.yaml      ← Test resources
 │
-├── 🔧 AUTOMATION
+├── 🔧 SCRIPTS
 │   └── scripts/
 │       ├── setup-kind.sh              ← Automated setup
 │       ├── test.sh                    ← Automated testing
@@ -100,21 +146,21 @@
 ├── 📦 BUILD
 │   ├── pom.xml                        ← Maven configuration
 │   ├── mvnw                           ← Maven wrapper
+│   ├── checkstyle.xml                 ← Code style rules
 │   └── target/
-│       └── josdkoperator-0.0.1-SNAPSHOT.jar ✅
+│       └── josdkoperator-*.jar        ✅ Built JAR
 │
 └── 📝 SOURCE CODE
     └── src/
         ├── main/java/com/k8/josdkoperator/
-        │   ├── JosdkOperatorApplication.java
-        │   ├── WebPageReconciler.java      ← EDIT THIS
-        │   └── customresource/
+        │   ├── JosdkOperatorApplication.java  ← Main entry point
+        │   ├── WebPageReconciler.java         ← Reconciliation logic
+        │   └── customresource/                ← CRD definitions
         │       ├── WebPage.java
         │       ├── WebPageSpec.java
         │       └── WebPageStatus.java
-        └── main/resources/
-            ├── application.yml
-            └── deployment.yaml
+        └── test/java/com/k8/josdkoperator/
+            └── JosdkOperatorApplicationTests.java  ← Unit tests
 ```
 
 ---
@@ -126,6 +172,8 @@
 - ✅ **Docker**: Dockerfile ready to build image
 - ✅ **Kubernetes**: All manifests configured
 - ✅ **Automation**: Scripts ready to run
+- ✅ **CI/CD**: GitHub Actions pipeline configured
+- ✅ **Testing**: Unit tests included
 - ✅ **Documentation**: Streamlined guides
 
 ---
@@ -162,6 +210,10 @@ After following this guide, you will:
 - ✅ Understand JOSDK fundamentals
 - ✅ Know how to test operators
 - ✅ Be able to extend the operator
+- ✅ **NEW**: Understand CI/CD for Kubernetes operators
+- ✅ **NEW**: Know how to automate operator testing
+- ✅ **NEW**: Learn container security scanning
+- ✅ **NEW**: Understand code quality automation
 
 ---
 
@@ -181,6 +233,9 @@ Kubernetes in Docker - runs a full K8s cluster in Docker. Used for development.
 
 ### RBAC
 Role-Based Access Control - grants permissions to the operator.
+
+### **NEW: CI/CD Pipeline**
+Automated testing, building, and deployment using GitHub Actions.
 
 ---
 
@@ -206,19 +261,31 @@ kubectl logs -f -n operators deployment/josdk-operator
 ./scripts/cleanup.sh
 ```
 
+### **NEW: Check CI/CD**
+```bash
+# View workflow status
+gh workflow view ci-cd.yml
+
+# Check latest run
+gh run list --workflow=ci-cd.yml
+```
+
 ---
 
 ## 📊 Technology Stack
 
-| Component | Version |
-|-----------|---------|
-| Java | 25.0.2 |
-| Maven | 3.9.14 |
-| Spring Boot | 4.0.5 |
-| JOSDK | 5.3.2 |
-| Kubernetes | Latest (via KinD) |
-| Docker | Latest |
-| Base Image | eclipse-temurin:25-jdk-alpine |
+| Component | Version | Purpose |
+|-----------|---------|---------|
+| Java | 25.0.2 | Runtime |
+| Maven | 3.9.14 | Build tool |
+| Spring Boot | 4.0.5 | Application framework |
+| JOSDK | 5.3.2 | Operator framework |
+| Kubernetes | Latest | Target platform |
+| KinD | Latest | Local K8s cluster |
+| Docker | Latest | Container runtime |
+| **NEW: GitHub Actions** | Latest | CI/CD platform |
+| **NEW: Trivy** | Latest | Security scanning |
+| **NEW: JaCoCo** | 0.8.11 | Code coverage |
 
 ---
 
@@ -229,6 +296,7 @@ kubectl logs -f -n operators deployment/josdk-operator
 3. **Test**: Verify with test scripts
 4. **Extend**: Modify the operator code
 5. **Deploy**: Push to production
+6. **Monitor**: Check CI/CD pipeline results
 
 ---
 
@@ -237,7 +305,14 @@ kubectl logs -f -n operators deployment/josdk-operator
 ### If you're stuck...
 1. Check the troubleshooting section in [QUICKSTART.md](QUICKSTART.md)
 2. Check the logs: `kubectl logs -f -n operators deployment/josdk-operator`
-3. Check status: `kubectl describe pod -n operators -l app=josdk-operator`
+3. Check pod status: `kubectl describe pod -n operators -l app=josdk-operator`
+4. Verify RBAC: `kubectl get clusterrolebinding josdk-operator`
+
+### **NEW: CI/CD Issues**
+1. Check GitHub Actions tab in your repository
+2. View workflow logs for detailed error messages
+3. Check security scan results in Security tab
+4. Verify container image in Packages
 
 ### If you want to customize...
 1. Edit `src/main/java/com/k8/josdkoperator/WebPageReconciler.java`
@@ -249,6 +324,8 @@ kubectl logs -f -n operators deployment/josdk-operator
 - [JOSDK Official Docs](https://javaoperatorsdk.io/)
 - [Kubernetes Operators](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
 - [KinD Documentation](https://kind.sigs.k8s.io/)
+- **[NEW] GitHub Actions](https://docs.github.com/en/actions)
+- **[NEW] Container Security](https://aquasecurity.github.io/trivy/)
 
 ---
 
@@ -260,6 +337,10 @@ You have a **fully functional Java Kubernetes Operator** with:
 - ✅ Streamlined documentation
 - ✅ Example resources
 - ✅ Testing utilities
+- ✅ **NEW: Complete CI/CD pipeline**
+- ✅ **NEW: Security scanning**
+- ✅ **NEW: Code quality automation**
+- ✅ **NEW: Container registry integration**
 
 **Ready to deploy?**
 
