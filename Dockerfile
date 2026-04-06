@@ -5,6 +5,7 @@ WORKDIR /build
 COPY pom.xml ./
 COPY .mvn .mvn
 COPY mvnw ./
+COPY checkstyle.xml ./
 
 # Download dependencies (cached if pom.xml unchanged)
 RUN ./mvnw dependency:go-offline -B
